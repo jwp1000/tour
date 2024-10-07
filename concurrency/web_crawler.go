@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 )
 
 type Fetcher interface {
@@ -29,14 +30,15 @@ func Crawl(url string, depth int, fetcher Fetcher, visited map[string]bool) {
 	}
 	fmt.Printf("found: %s %q\n", url, body)
 	for _, u := range urls {
-		Crawl(u, depth-1, fetcher, visited)
+		go Crawl(u, depth-1, fetcher, visited)
 	}
 	return
 }
 
 func main() {
 	visited := make(map[string]bool)
-	Crawl("https://golang.org/", 4, fetcher, visited)
+	go Crawl("https://golang.org/", 4, fetcher, visited)
+	time.Sleep(time.Second * 3)
 }
 
 // fakeFetcher is Fetcher that returns canned results.
