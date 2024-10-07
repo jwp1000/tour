@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"sync"
-	"time"
 )
 
 type Fetcher interface {
@@ -14,36 +13,45 @@ type Fetcher interface {
 
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher, visited map[string]bool, mu *sync.Mutex) {
+func Crawl(url string, depth int, fetcher Fetcher, visited map[string]bool, mu *sync.Mutex, donech chan bool) {
 	fmt.Println("crawl:", url, " depth: ", depth)
 	if depth <= 0 {
+		donech <- true
 		return
 	}
 	// Don't fetch the same URL twice.
-	mu.Lock()
+	//mu.Lock()
 	if _, ok := visited[url]; ok {
 		fmt.Println("already visited:", url)
+		donech <- true
 		return
 	}
 	visited[url] = true
-	mu.Unlock()
+	//mu.Unlock()
 	body, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
+		donech <- true
 		return
 	}
 	fmt.Printf("found: %s %q\n", url, body)
+	children_are_done := make(chan bool)
 	for _, u := range urls {
-		go Crawl(u, depth-1, fetcher, visited, mu)
+		go Crawl(u, depth-1, fetcher, visited, mu, children_are_done)
 	}
+	for _, _ = range urls {
+		<-children_are_done
+	}
+	donech <- true
 	return
 }
 
 func main() {
 	visited := make(map[string]bool)
 	var mu sync.Mutex
-	go Crawl("https://golang.org/", 4, fetcher, visited, &mu)
-	time.Sleep(time.Second * 3)
+	donech := make(chan bool)
+	go Crawl("https://golang.org/", 4, fetcher, visited, &mu, donech)
+	<-donech
 }
 
 // fakeFetcher is Fetcher that returns canned results.
