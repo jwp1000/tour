@@ -35,43 +35,41 @@ type Fetcher interface {
 
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher, visited map[string]bool, c *SafeCounter, donech chan bool) {
-	fmt.Println("crawl:", url, " depth: ", depth)
+func Crawl(url string, depth int, fetcher Fetcher, c *SafeCounter, iAmDone chan bool) {
 	if depth <= 0 {
-		donech <- true
+		iAmDone <- true
 		return
 	}
 	// Don't fetch the same URL twice.
 	if count := c.Value(url); count > 0 {
 		fmt.Println("already visited:", url)
-		donech <- true
+		iAmDone <- true
 		return
 	}
 	c.Inc(url)
 	body, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
-		donech <- true
+		iAmDone <- true
 		return
 	}
 	fmt.Printf("found: %s %q\n", url, body)
-	children_are_done := make(chan bool)
+	childrenAreDone := make(chan bool)
 	for _, u := range urls {
-		go Crawl(u, depth-1, fetcher, visited, c, children_are_done)
+		go Crawl(u, depth-1, fetcher, c, childrenAreDone)
 	}
 	for _, _ = range urls {
-		<-children_are_done
+		<-childrenAreDone
 	}
-	donech <- true
+	iAmDone <- true
 	return
 }
 
 func main() {
 	c := SafeCounter{v: make(map[string]int)}
-	visited := make(map[string]bool)
-	donech := make(chan bool)
-	go Crawl("https://golang.org/", 4, fetcher, visited, &c, donech)
-	<-donech
+	childrenAreDone := make(chan bool)
+	go Crawl("https://golang.org/", 4, fetcher, &c, childrenAreDone)
+	<-childrenAreDone
 }
 
 // fakeFetcher is Fetcher that returns canned results.
