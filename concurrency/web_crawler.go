@@ -15,12 +15,14 @@ type Fetcher interface {
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
 func Crawl(url string, depth int, fetcher Fetcher, visited map[string]bool, mu *sync.Mutex) {
+	fmt.Println("crawl:", url, " depth: ", depth)
 	if depth <= 0 {
 		return
 	}
 	// Don't fetch the same URL twice.
 	mu.Lock()
 	if _, ok := visited[url]; ok {
+		fmt.Println("already visited:", url)
 		return
 	}
 	visited[url] = true
