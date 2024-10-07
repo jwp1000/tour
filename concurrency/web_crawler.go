@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -13,16 +14,17 @@ type Fetcher interface {
 
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher, visited map[string]bool) {
-	// TODO: Fetch URLs in parallel.
+func Crawl(url string, depth int, fetcher Fetcher, visited map[string]bool, mu *sync.Mutex) {
 	if depth <= 0 {
 		return
 	}
 	// Don't fetch the same URL twice.
+	mu.Lock()
 	if _, ok := visited[url]; ok {
 		return
 	}
 	visited[url] = true
+	mu.Unlock()
 	body, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
@@ -30,14 +32,15 @@ func Crawl(url string, depth int, fetcher Fetcher, visited map[string]bool) {
 	}
 	fmt.Printf("found: %s %q\n", url, body)
 	for _, u := range urls {
-		go Crawl(u, depth-1, fetcher, visited)
+		go Crawl(u, depth-1, fetcher, visited, mu)
 	}
 	return
 }
 
 func main() {
 	visited := make(map[string]bool)
-	go Crawl("https://golang.org/", 4, fetcher, visited)
+	var mu sync.Mutex
+	go Crawl("https://golang.org/", 4, fetcher, visited, &mu)
 	time.Sleep(time.Second * 3)
 }
 
